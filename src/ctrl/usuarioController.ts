@@ -2,7 +2,14 @@ import express, {Request, Response } from "express";
 import Usuario from '../models/Usuario';
 import generarJWT from "../helpers/generarJWT";
 import bcrypt from 'bcrypt';
+import jwt, { JwtPayload } from "jsonwebtoken";
+import { ReturnDocument } from "mongodb";
+import generarId from "../helpers/generarid";
 
+
+interface Requestx extends Request{
+    user?: string | JwtPayload;
+  }
 //: Promise<void>
 const registrar = async (req: Request, res: Response) => {
     const {identificacion} = req.body;
@@ -25,8 +32,9 @@ const registrar = async (req: Request, res: Response) => {
     //res.json({msg: "Registrando usuario..."})
 };
 
-const perfil = (req: Request, res: Response) => {
-    res.json({msg: "Mostrando perfil"})
+const perfil = (req: Requestx, res: Response) => {
+    const {user} = req;
+    res.json({perfil: user});
 };
 
 const confirmar = async (req: Request, res: Response) => {
@@ -76,9 +84,63 @@ const autenticar = async (req: Request, res: Response) => {
     
 };
 
+const olvidePassword =  async(req: Request, res: Response) =>{
+    const {email} = req.body;
+    const usuarioX = await Usuario.findOne({email});
+    if(usuarioX){
+        try {
+            usuarioX.token = generarId();
+            usuarioX.save();
+            res.json({msg: "Hemos enviado un email con las instrucciones"})
+        } catch (e) {
+            const error = new Error("Falla al generar el ID")
+            res.status(400).json({msg: error.message});
+        }
+    }else{
+        const error = new Error("Usuario no registrado en la DB")
+        res.status(400).json({msg: error.message});
+    }
+    //console.log(email);
+}
+
+const comprobarToken = async(req: Request, res: Response) =>{
+    const {token} = req.params;
+    const tokenX = await Usuario.findOne({token});
+    if(tokenX){
+
+    }else{
+        const error = new Error("token no valido")
+        res.status(400).json({msg: error.message});
+    }
+}
+
+const nuevoPassword = async(req: Request, res: Response) =>{
+    const {token} = req.params;
+    const {password} = req.body;
+    const usuarioX = await Usuario.findOne({token});
+    if(usuarioX){
+        try {
+           usuarioX.token='';
+           usuarioX.password = password;
+           await usuarioX.save();
+           res.json({msg: "Password modificado correctamente"});
+        } catch (error) {
+           const e = new Error("Hubo un error")
+           res.status(400).json({msg: e.message});
+        }
+    }else{
+        const error = new Error("Hubo un error")
+        res.status(400).json({msg: error.message});
+    }
+}
+
+
 export{
     registrar,
     perfil,
     confirmar,
-    autenticar
+    autenticar,
+    olvidePassword,
+    comprobarToken,
+    nuevoPassword
 };
